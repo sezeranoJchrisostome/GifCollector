@@ -5,12 +5,13 @@ import idl from "./idl/idl.json"
 import { Connection, PublicKey, clusterApiUrl } from '@solana/web3.js';
 import { Program, web3,Provider } from '@project-serum/anchor';
 import kp from "./keypair/keypair.json"
+import { Icon } from '@iconify/react';
 
 
 
 
 // SystemProgram is a reference to the Solana runtime!
-const { SystemProgram, Keypair } = web3;
+const { SystemProgram } = web3;
 
 // Create a keypair for the account that will hold the GIF data.
 const arr  = Object.values(kp._keypair.secretKey);
@@ -98,6 +99,21 @@ const App = () => {
       console.log('Empty input. Try again.');
     }
   };
+
+  const liked = (likers) => {
+    let iLiked = false;
+
+    likers.map(userPubKey => {
+      const provider = getProvider();
+      console.log(provider.wallet.publicKey.toString() ==  userPubKey.toString())
+      if(provider.wallet.publicKey.toString() == userPubKey.toString()){
+        iLiked = true;
+      }
+
+    })
+    return iLiked
+   
+  }
   
   const renderConnectedContainer = () => (
     <div className="connected-container">
@@ -115,11 +131,28 @@ const App = () => {
         <button type="submit" className="cta-button submit-gif-button">Submit</button>
       </form>
       <div className="gif-grid">
-        {gifList.map((gif,index) => (
-          <div className="gif-item" key={index}>
-            <img src={gif.gifLink} alt={gif} />
-          </div>
-        ))}
+        {gifList.map((gif,index) => {
+          return (
+            <div className="gif-item" key={index}>
+              <img src={gif.gifLink} alt={gif} />
+              <div className="flex items-center justify-center text-white">
+                {
+                 
+                  liked(gif.likers) == true  ?  (
+                    <Icon icon="bxs:like" className='cursor-not-allowed' color='white' height={30} />
+                  ) : (
+                    <Icon icon="ei:like" className='cursor-pointer'  color='white' height={40} onClick={
+                      async () => {
+                        await addLike(gif.gifLink);
+                      }
+                    } />
+                  )
+                }
+                <span className=' font-bold text-lg' >{ gif.likers.length }</span>
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
        
@@ -171,7 +204,7 @@ const App = () => {
     try {
       const provider = getProvider();
       const program = new Program(idl, programID, provider);
-      const account = await program.account.baseAccount.fetch(baseAccount.publicKey)
+      const account = await program.account.baseAccount.fetch(baseAccount.publicKey);
       setGifList(account.gifList);
     } catch (error) {
       console.log("Error in getGifList: ", error);
@@ -179,6 +212,23 @@ const App = () => {
     }
   } 
 
+  
+  const addLike = async (url) => {
+    try {
+      const provider = getProvider();
+      const program = new Program(idl, programID, provider);
+      await program.rpc.addLike(url,{
+        accounts: {
+          baseAccount: baseAccount.publicKey,
+          user: provider.wallet.publicKey,
+        }
+      });
+      await getGifList();
+  
+    } catch(error) {
+      console.log("Error creating BaseAccount account:", error.message)
+    }
+  }
   useEffect(() => {
     if (walletAddress) {
       console.log('Fetching GIF list...');
